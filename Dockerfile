@@ -1,6 +1,6 @@
 FROM node:18-bookworm-slim
 
-# Install dependencies
+# Install system packages
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     imagemagick \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp
-RUN pip3 install --no-cache-dir --break-system-packages -U yt-dlp
+RUN pip3 install --no-cache-dir -U yt-dlp
 
 # Install Arial font
 RUN mkdir -p /tmp/fonts && \
@@ -25,27 +25,22 @@ RUN mkdir -p /tmp/fonts && \
     fc-cache -f && \
     rm -rf /tmp/fonts
 
-# Create app/data dirs
-RUN mkdir -p /yt2009 /data && \
-    chmod -R 777 /data
+# App dirs
+RUN mkdir -p /yt2009 /data
 
 WORKDIR /yt2009
 
-# Copy package files first for better caching
-COPY package*.json ./
+# Copy package files
+COPY package.json ./
 
-# Install npm deps
+# Install dependencies
 RUN npm install
 
-# Copy project
+# Copy rest of app
 COPY . .
 
-# Create runtime dirs
-RUN mkdir -p \
-    cache \
-    temp \
-    assets \
-    back/cache_dir
+# Create dirs
+RUN mkdir -p cache temp assets back/cache_dir
 
 # Symlinks
 RUN ln -sf /data/androiddata.json back/androiddata.json && \
@@ -53,37 +48,18 @@ RUN ln -sf /data/androiddata.json back/androiddata.json && \
     ln -sf /data/config.json back/config.json && \
     ln -sf /data/mobilehelper_userdata.json back/mobilehelper_userdata.json && \
     ln -sf /data/comments.json back/cache_dir/comments.json && \
-    ln -sf /data/accessdata back/accessdata && \
-    ln -sf /data/cert.crt cert.crt && \
-    ln -sf /data/cert.key cert.key
+    ln -sf /data/accessdata back/accessdata
 
 # Default config
-RUN echo "{\"env\":\"dev\"}" > back/config.json && \
-    node post_config_setup.js || true
+RUN echo "{\"env\":\"prod\"}" > back/config.json
 
-# Render uses dynamic PORT
 ENV PORT=10000
-
-# YT2009 config
-ENV YT2009_PORT=10000 \
-    YT2009_ENV=prod \
-    YT2009_IP=0.0.0.0 \
-    YT2009_SSL=false \
-    YT2009_SSLPORT=443 \
-    YT2009_SSLPATH=/yt2009/cert.crt \
-    YT2009_SSLKEY=/yt2009/cert.key \
-    YT2009_AUTO_MAINTAIN=true \
-    YT2009_MAINTAIN_MAX_SIZE=10 \
-    YT2009_MAINTAIN_MAX_CACHE_SIZE=15 \
-    YT2009_FALLBACK=false \
-    YT2009_DISABLEMASTER=false \
-    YT2009_RATELIMIT=false \
-    YT2009_AC=false \
-    YT2009_GDATA_AUTH=false
+ENV YT2009_PORT=10000
+ENV YT2009_IP=0.0.0.0
+ENV YT2009_ENV=prod
 
 EXPOSE 10000
 
-# Ensure startup script executable
 RUN chmod +x docker-entrypoint.sh
 
 ENTRYPOINT ["sh", "docker-entrypoint.sh"]
